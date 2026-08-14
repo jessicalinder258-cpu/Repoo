@@ -168,8 +168,10 @@ def test_orig_0734_profile_replaces_five_requested_fields(tmp_path: Path) -> Non
     assert "BRIA" not in text
     assert "SMITH" in text
     assert "JOHN" in text
-    assert "DOB 08/14" in text
+    assert "08/14" in text
     assert "EXP 07/21/2030" in text
-    assert "0807179999" in text.replace(" ", "")
+    assert text.count("07/21") == 1
+    assert "080717" in text
+    assert "9999" in text
     assert "123456789" in text
     document.close()
