@@ -120,7 +120,12 @@ function startEditing(titleEl, task) {
   input.value = task.title;
   input.maxLength = 200;
 
+  // Enter and the blur it triggers would otherwise both try to close the editor.
+  let closed = false;
   const finish = async (save) => {
+    if (closed) return;
+    closed = true;
+
     input.replaceWith(titleEl);
     titleEl.dataset.editing = "false";
     const value = input.value.trim();
