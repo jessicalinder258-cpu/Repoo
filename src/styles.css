@@ -1,9 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap');
-
 :root {
   color: #25241f;
   background: #f4f1e9;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Segoe UI', Arial, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   --ink: #25241f;
@@ -41,14 +39,14 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(232, 93, 65,
   z-index: 10;
 }
 .landing-bar { justify-content: space-between; }
-.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-family: 'DM Serif Display', serif; font-size: 22px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-family: Georgia, serif; font-size: 22px; }
 .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; color: white; background: var(--coral); border-radius: 10px 10px 10px 3px; transform: rotate(-2deg); }
 .privacy-pill { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: #5a6c59; background: #e9efe5; padding: 8px 12px; border-radius: 99px; }
 
 .hero { flex: 1; width: min(780px, calc(100% - 36px)); margin: 0 auto; padding: 64px 0 30px; text-align: center; }
 .eyebrow { display: flex; justify-content: center; align-items: center; gap: 8px; color: var(--coral); font-size: 11px; font-weight: 700; letter-spacing: .16em; }
 .eyebrow span { width: 19px; height: 1px; background: var(--coral); }
-.hero h1 { margin: 19px 0 14px; font-family: 'DM Serif Display', serif; font-size: clamp(42px, 6vw, 65px); line-height: 1.02; letter-spacing: -.025em; font-weight: 400; }
+.hero h1 { margin: 19px 0 14px; font-family: Georgia, serif; font-size: clamp(42px, 6vw, 65px); line-height: 1.02; letter-spacing: -.025em; font-weight: 400; }
 .hero h1 em { color: var(--coral); font-weight: 400; }
 .hero-copy { width: min(550px, 100%); margin: 0 auto 34px; color: var(--muted); font-size: 16px; line-height: 1.65; }
 
@@ -71,7 +69,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(232, 93, 65,
 .drop-zone.is-dragging { border-color: var(--coral); background: #fff9f4; transform: scale(1.01); }
 .drop-zone input[type='file'] { display: none; }
 .upload-icon { width: 51px; height: 51px; display: grid; place-items: center; margin-bottom: 13px; color: var(--coral); background: #fae7df; border-radius: 15px; }
-.drop-zone h2 { margin: 0 0 5px; font-family: 'DM Serif Display', serif; font-size: 23px; font-weight: 400; }
+.drop-zone h2 { margin: 0 0 5px; font-family: Georgia, serif; font-size: 23px; font-weight: 400; }
 .drop-zone p { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
 .drop-zone small { margin-top: 13px; color: #a09c92; font-size: 10px; }
 .primary-button { border: 0; border-radius: 9px; padding: 12px 19px; display: inline-flex; justify-content: center; align-items: center; gap: 8px; color: white; background: var(--coral); font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 0 5px 14px rgba(232, 93, 65, .22); transition: .18s ease; }
@@ -137,7 +135,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(232, 93, 65,
 
 .export-panel { border-left: 1px solid var(--line); padding: 28px 20px 20px; display: flex; flex-direction: column; }
 .export-icon { width: 42px; height: 42px; display: grid; place-items: center; color: var(--coral); background: #fae7df; border-radius: 12px; }
-.export-panel h2 { margin: 14px 0 6px; font-family: 'DM Serif Display', serif; font-size: 21px; font-weight: 400; }
+.export-panel h2 { margin: 14px 0 6px; font-family: Georgia, serif; font-size: 21px; font-weight: 400; }
 .export-panel p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .export-options { margin-top: 25px; padding: 2px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .export-options div { display: flex; align-items: center; justify-content: space-between; padding: 10px 2px; font-size: 10px; }

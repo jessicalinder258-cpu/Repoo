@@ -86,7 +86,7 @@ function App() {
         if (mark.kind === 'text') {
           context.globalAlpha = 1
           context.fillStyle = mark.color
-          context.font = `600 ${mark.size * height}px "DM Sans", sans-serif`
+          context.font = `600 ${mark.size * height}px "Segoe UI", Arial, sans-serif`
           context.fillText(mark.value, mark.x * width, mark.y * height)
           continue
         }

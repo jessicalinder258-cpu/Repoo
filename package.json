@@ -3,11 +3,14 @@
   "version": "1.0.0",
   "description": "Private, browser-based PDF annotation and JPG export tool",
   "type": "module",
+  "main": "electron/main.mjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "desktop": "npm run build && electron .",
+    "package:windows": "npm run build && electron-builder --win portable"
   },
   "repository": {
     "type": "git",
@@ -20,6 +23,30 @@
     "url": "https://github.com/jessicalinder258-cpu/Repoo/issues"
   },
   "homepage": "https://github.com/jessicalinder258-cpu/Repoo#readme",
+  "build": {
+    "appId": "com.paperlight.pdfeditor",
+    "productName": "Paperlight",
+    "artifactName": "Paperlight-PDF-Editor-${version}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  },
   "dependencies": {
     "jszip": "^3.10.1",
     "lucide-react": "^1.31.0",
@@ -32,6 +59,8 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.5",
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^10.8.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.4",

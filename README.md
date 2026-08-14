@@ -18,3 +18,13 @@ npm run dev
 ```
 
 Create a production build with `npm run build`.
+
+## Windows desktop app
+
+Build the portable Windows application with:
+
+```bash
+npm run package:windows
+```
+
+The finished `Paperlight-PDF-Editor-1.0.0.exe` is created in the `release` folder.
