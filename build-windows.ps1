@@ -8,7 +8,7 @@ python -m PyInstaller `
     --onefile `
     --windowed `
     --name "PDF-Template-Editor" `
-    --add-data "assets/DejaVuSans.ttf;assets" `
+    --add-data "assets/Arimo-Bold.ttf;assets" `
     launcher.py
 
 Write-Host "Windows executable created at dist/PDF-Template-Editor.exe"

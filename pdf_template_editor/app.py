@@ -171,7 +171,7 @@ class PdfTemplateEditor(tk.Tk):
                 self.pdf_path,
                 {name: value.get() for name, value in self.field_values.items()},
                 selected,
-                resource_path("assets/DejaVuSans.ttf"),
+                resource_path("assets/Arimo-Bold.ttf"),
             )
         except TemplateError as exc:
             messagebox.showerror("Export failed", str(exc), parent=self)

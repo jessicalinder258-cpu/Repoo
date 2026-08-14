@@ -9,7 +9,7 @@ from pdf_template_editor.pdf_service import (
 )
 
 
-FONT_PATH = Path(__file__).parents[1] / "assets" / "DejaVuSans.ttf"
+FONT_PATH = Path(__file__).parents[1] / "assets" / "Arimo-Bold.ttf"
 
 
 def make_template(path: Path, pages: int = 1) -> None:
@@ -89,12 +89,20 @@ def test_replacement_inherits_exact_marker_style_and_preserves_graphics() -> Non
     page.insert_text(
         (30, 70),
         "$name",
-        fontname="tibo",
+        fontname="templatearial",
+        fontfile=str(FONT_PATH),
         fontsize=17,
         color=(0.2, 0.4, 0.6),
     )
     page.insert_text((200, 70), "Keep me", fontsize=11)
     drawings_before = len(page.get_drawings())
+    original = next(
+        span
+        for block in page.get_text("dict")["blocks"]
+        for line in block.get("lines", [])
+        for span in line.get("spans", [])
+        if "$name" in span["text"]
+    )
 
     _apply_marker_values(document, {"$name": "Alice"}, FONT_PATH)
 
@@ -105,9 +113,10 @@ def test_replacement_inherits_exact_marker_style_and_preserves_graphics() -> Non
         for span in line.get("spans", [])
     ]
     replacement = next(span for span in spans if "Alice" in span["text"])
-    assert replacement["font"] == "Times-Bold"
-    assert replacement["size"] == 17
-    assert replacement["color"] == 0x336699
+    assert replacement["font"] == original["font"]
+    assert replacement["size"] == original["size"]
+    assert replacement["color"] == original["color"]
+    assert replacement["origin"] == original["origin"]
     assert "Keep me" in page.get_text()
     assert len(page.get_drawings()) == drawings_before
     document.close()

@@ -20,12 +20,12 @@ Put placeholder text directly into the PDF:
 - `$name`
 - `=var`
 - `=dob`
-- Any other name that starts with `$` or `=` and contains letters, numbers, or
-  underscores, such as `$customer_name`.
 
 The entered value inherits the placeholder's original font, size, color, and
 position. Only the placeholder text is removed; other text, images, graphics,
-and the page background are preserved.
+neighboring rows, and the page background are preserved. On Windows, the
+editor uses the matching installed Arial font from the template; an
+Arial-compatible font is included as a fallback.
 
 The PDF must contain real selectable text. Placeholders in a scanned image
 cannot be detected. Leave enough blank space after each placeholder for the

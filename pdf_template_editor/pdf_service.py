@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import os
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,6 +11,7 @@ import pymupdf
 
 
 PLACEHOLDER_PATTERN = re.compile(r"(?<![\w$=])([=$][A-Za-z][A-Za-z0-9_]*)")
+SUPPORTED_MARKERS = ("$name", "=var", "=dob")
 
 
 class TemplateError(RuntimeError):
@@ -27,13 +29,14 @@ class TextStyle:
     baseline: float
     font_size: float
     color: tuple[float, float, float]
-    font_name: str | None
+    font_family: str
     opacity: float
 
 
 def discover_placeholders(pdf_path: str | Path) -> list[Placeholder]:
     """Return placeholders in the order they first appear in the PDF."""
     grouped: OrderedDict[str, list[str]] = OrderedDict()
+    pymupdf.TOOLS.set_small_glyph_heights(True)
 
     try:
         with pymupdf.open(pdf_path) as document:
@@ -42,6 +45,8 @@ def discover_placeholders(pdf_path: str | Path) -> list[Placeholder]:
 
             for page in document:
                 for marker in PLACEHOLDER_PATTERN.findall(page.get_text("text")):
+                    if marker not in SUPPORTED_MARKERS:
+                        continue
                     name = marker[1:]
                     markers = grouped.setdefault(name, [])
                     if marker not in markers:
@@ -68,6 +73,7 @@ def export_template_as_jpg(
     created_files: list[Path] = []
 
     try:
+        pymupdf.TOOLS.set_small_glyph_heights(True)
         with pymupdf.open(pdf_path) as document:
             placeholders = discover_placeholders(pdf_path)
             marker_values = {
@@ -100,12 +106,17 @@ def _apply_marker_values(
     font_path: str | Path,
 ) -> None:
     for page in document:
-        replacements: list[tuple[pymupdf.Rect, str, TextStyle]] = []
+        replacements: list[tuple[pymupdf.Rect, str, str, TextStyle]] = []
 
         for marker, value in marker_values.items():
             for rectangle in page.search_for(marker):
                 replacements.append(
-                    (rectangle, value, _style_at_rectangle(page, rectangle))
+                    (
+                        rectangle,
+                        marker,
+                        value,
+                        _style_at_rectangle(page, rectangle),
+                    )
                 )
                 page.add_redact_annot(
                     rectangle,
@@ -117,9 +128,16 @@ def _apply_marker_values(
             # Remove only the placeholder glyphs. Images, vector graphics, and
             # the original page background must remain untouched.
             page.apply_redactions(images=0, graphics=0)
-            for rectangle, value, style in replacements:
+            for rectangle, marker, value, style in replacements:
                 if value:
-                    _insert_replacement(page, rectangle, value, style, font_path)
+                    _insert_replacement(
+                        page,
+                        rectangle,
+                        marker,
+                        value,
+                        style,
+                        font_path,
+                    )
 
 
 def _page_output_path(base: Path, page_number: int, page_count: int) -> Path:
@@ -129,26 +147,32 @@ def _page_output_path(base: Path, page_number: int, page_count: int) -> Path:
 
 
 def _style_at_rectangle(page: pymupdf.Page, rectangle: pymupdf.Rect) -> TextStyle:
+    matching_spans: list[tuple[float, dict]] = []
     for block in page.get_text("dict").get("blocks", []):
         for line in block.get("lines", []):
             for span in line.get("spans", []):
                 span_rectangle = pymupdf.Rect(span["bbox"])
-                if span_rectangle.intersects(rectangle):
-                    return TextStyle(
-                        baseline=float(span["origin"][1]),
-                        font_size=max(4.0, float(span["size"])),
-                        color=_pdf_color(int(span.get("color", 0))),
-                        font_name=_font_resource(page, str(span.get("font", ""))),
-                        opacity=max(
-                            0.0, min(1.0, float(span.get("alpha", 255)) / 255)
-                        ),
-                    )
+                intersection = span_rectangle & rectangle
+                if not intersection.is_empty:
+                    matching_spans.append((intersection.get_area(), span))
+
+    if matching_spans:
+        # OCR PDFs often have overlapping line boxes. Selecting by maximum
+        # overlap prevents a neighboring row from supplying the wrong baseline.
+        span = max(matching_spans, key=lambda match: match[0])[1]
+        return TextStyle(
+            baseline=float(span["origin"][1]),
+            font_size=max(4.0, float(span["size"])),
+            color=_pdf_color(int(span.get("color", 0))),
+            font_family=str(span.get("font", "")),
+            opacity=max(0.0, min(1.0, float(span.get("alpha", 255)) / 255)),
+        )
 
     return TextStyle(
         baseline=rectangle.y1 - max(1.0, rectangle.height * 0.18),
         font_size=max(4.0, rectangle.height * 0.75),
         color=(0.0, 0.0, 0.0),
-        font_name=None,
+        font_family="",
         opacity=1.0,
     )
 
@@ -156,46 +180,70 @@ def _style_at_rectangle(page: pymupdf.Page, rectangle: pymupdf.Rect) -> TextStyl
 def _insert_replacement(
     page: pymupdf.Page,
     rectangle: pymupdf.Rect,
+    marker: str,
     value: str,
     style: TextStyle,
     fallback_font_path: str | Path,
 ) -> None:
-    font_arguments: dict[str, str] = {}
-    if style.font_name:
-        # Reuse the font resource already embedded in this PDF page. This keeps
-        # weight, italics, glyph widths, and typeface identical to the marker.
-        font_arguments["fontname"] = style.font_name
-    else:
-        font_arguments["fontname"] = "templatefont"
-        font_arguments["fontfile"] = str(fallback_font_path)
+    font_path = _matching_system_font(style.font_family, fallback_font_path)
+    horizontal_scale = _horizontal_scale(
+        marker, rectangle.width, style.font_size, font_path
+    )
+    origin = pymupdf.Point(rectangle.x0, style.baseline)
 
     page.insert_text(
-        (rectangle.x0, style.baseline),
+        origin,
         value,
         fontsize=style.font_size,
         color=style.color,
         fill_opacity=style.opacity,
+        fontname="replacementfont",
+        fontfile=str(font_path),
+        morph=(origin, pymupdf.Matrix(horizontal_scale, 1)),
         overlay=True,
-        **font_arguments,
     )
 
 
-def _font_resource(page: pymupdf.Page, span_font_name: str) -> str | None:
-    target = _normalized_font_name(span_font_name)
-    if not target:
-        return None
+def _matching_system_font(
+    font_family: str, fallback_font_path: str | Path
+) -> Path:
+    normalized = _normalized_font_name(font_family)
+    windows_fonts = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
+    candidates: list[str] = []
+    if "arial" in normalized:
+        candidates.append(
+            "arialbd.ttf" if "bold" in normalized else "arial.ttf"
+        )
+    elif "timesnewroman" in normalized:
+        candidates.append(
+            "timesbd.ttf" if "bold" in normalized else "times.ttf"
+        )
+    elif "calibri" in normalized:
+        candidates.append(
+            "calibrib.ttf" if "bold" in normalized else "calibri.ttf"
+        )
 
-    for font in page.get_fonts(full=True):
-        base_font_name = str(font[3])
-        resource_name = str(font[4])
-        if _normalized_font_name(base_font_name) == target:
-            return resource_name
-    return None
+    for candidate in candidates:
+        path = windows_fonts / candidate
+        if path.is_file():
+            return path
+    return Path(fallback_font_path)
+
+
+def _horizontal_scale(
+    marker: str,
+    original_width: float,
+    font_size: float,
+    font_path: str | Path,
+) -> float:
+    font = pymupdf.Font(fontfile=str(font_path))
+    natural_width = font.text_length(marker, fontsize=font_size)
+    if natural_width <= 0:
+        return 1.0
+    return max(0.5, min(2.0, original_width / natural_width))
 
 
 def _normalized_font_name(font_name: str) -> str:
-    # Embedded subset names commonly look like "ABCDEF+Arial-BoldMT".
-    font_name = re.sub(r"^[A-Z]{6}\+", "", font_name)
     return re.sub(r"[^a-z0-9]", "", font_name.lower())
 
 
