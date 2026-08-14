@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tasks</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9989;</text></svg>"
+    />
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <div>
+          <h1>Tasks</h1>
+          <p class="subtitle" id="summary">Loading&hellip;</p>
+        </div>
+        <div class="progress-ring" id="progress" aria-hidden="true">
+          <span id="progress-label">0%</span>
+        </div>
+      </header>
+
+      <form class="composer" id="composer" autocomplete="off">
+        <input
+          class="composer-title"
+          id="title"
+          name="title"
+          type="text"
+          placeholder="What needs doing?"
+          maxlength="200"
+          required
+          aria-label="Task title"
+        />
+        <div class="composer-row">
+          <label class="field">
+            <span>Priority</span>
+            <select id="priority" aria-label="Priority">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Due</span>
+            <input id="due-date" type="date" aria-label="Due date" />
+          </label>
+          <button class="primary" type="submit">Add task</button>
+        </div>
+        <p class="error" id="error" role="alert" hidden></p>
+      </form>
+
+      <nav class="filters" id="filters" role="tablist">
+        <button role="tab" class="active" data-filter="all">All</button>
+        <button role="tab" data-filter="active">Active</button>
+        <button role="tab" data-filter="completed">Completed</button>
+        <button class="ghost" id="clear-completed" type="button">
+          Clear completed
+        </button>
+      </nav>
+
+      <ul class="tasks" id="tasks"></ul>
+
+      <p class="empty" id="empty" hidden>Nothing here yet. Add your first task.</p>
+
+      <footer class="footer">
+        Data is stored in SQLite on the server.
+        <a href="/docs">API docs</a>
+      </footer>
+    </main>
+
+    <template id="task-template">
+      <li class="task">
+        <label class="checkbox">
+          <input type="checkbox" class="toggle" />
+          <span class="box" aria-hidden="true"></span>
+        </label>
+        <div class="task-body">
+          <p class="task-title" tabindex="0" role="button"></p>
+          <p class="task-notes"></p>
+          <div class="task-meta">
+            <span class="badge priority"></span>
+            <span class="badge due"></span>
+          </div>
+        </div>
+        <button class="delete" type="button" aria-label="Delete task">&times;</button>
+      </li>
+    </template>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
