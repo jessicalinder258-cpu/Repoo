@@ -139,8 +139,7 @@ def _template_fields(
     document: pymupdf.Document,
 ) -> tuple[TemplateField, ...] | None:
     document_text = "\n".join(page.get_text("text") for page in document)
-    required_targets = {field.target for field in ORIG_0734_FIELDS}
-    if required_targets.issubset(document_text):
+    if all(field.target in document_text for field in ORIG_0734_FIELDS):
         return ORIG_0734_FIELDS
     return None
 
