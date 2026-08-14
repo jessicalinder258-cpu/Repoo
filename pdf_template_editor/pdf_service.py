@@ -118,8 +118,9 @@ def _apply_marker_values(
                         _style_at_rectangle(page, rectangle),
                     )
                 )
+                redaction_box = _redaction_hit_box(rectangle)
                 page.add_redact_annot(
-                    rectangle,
+                    redaction_box,
                     fill=False,
                     cross_out=False,
                 )
@@ -138,6 +139,15 @@ def _apply_marker_values(
                         style,
                         font_path,
                     )
+
+
+def _redaction_hit_box(rectangle: pymupdf.Rect) -> pymupdf.Rect:
+    # A redaction removes an entire glyph when any part of its character box
+    # intersects the annotation. OCR character boxes in the supplied template
+    # overlap neighboring rows, so use a narrow band through the visual center
+    # of this row instead of the full character height.
+    center_y = (rectangle.y0 + rectangle.y1) / 2
+    return pymupdf.Rect(rectangle.x0, center_y - 0.25, rectangle.x1, center_y + 0.25)
 
 
 def _page_output_path(base: Path, page_number: int, page_count: int) -> Path:

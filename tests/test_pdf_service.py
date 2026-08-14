@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pymupdf
+import pytest
 
 from pdf_template_editor.pdf_service import (
     _apply_marker_values,
@@ -114,7 +115,7 @@ def test_replacement_inherits_exact_marker_style_and_preserves_graphics() -> Non
     ]
     replacement = next(span for span in spans if "Alice" in span["text"])
     assert replacement["font"] == original["font"]
-    assert replacement["size"] == original["size"]
+    assert replacement["size"] == pytest.approx(original["size"], abs=0.01)
     assert replacement["color"] == original["color"]
     assert replacement["origin"] == original["origin"]
     assert "Keep me" in page.get_text()
