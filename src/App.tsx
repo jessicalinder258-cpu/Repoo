@@ -193,9 +193,9 @@ function App() {
     drawingRef.current = {
       kind: 'stroke',
       points: [point],
-      color: tool === 'highlight' ? '#f6ca52' : color,
-      width: tool === 'highlight' ? 0.025 : 0.004,
-      opacity: tool === 'highlight' ? 0.42 : 1,
+      color: tool === 'highlight' ? '#f2b705' : color,
+      width: tool === 'highlight' ? 0.032 : 0.004,
+      opacity: tool === 'highlight' ? 0.62 : 1,
     }
   }
 
@@ -383,10 +383,10 @@ function App() {
         <section className="workspace">
           <div className="toolbar">
             <div className="tool-group">
-              <button className={tool === 'select' ? 'selected' : ''} onClick={() => setTool('select')} title="Select"><MousePointer2 size={18} /></button>
-              <button className={tool === 'draw' ? 'selected' : ''} onClick={() => setTool('draw')} title="Draw"><Pencil size={18} /></button>
-              <button className={tool === 'highlight' ? 'selected' : ''} onClick={() => setTool('highlight')} title="Highlight"><Highlighter size={18} /></button>
-              <button className={tool === 'text' ? 'selected' : ''} onClick={() => setTool('text')} title="Add text"><Type size={18} /></button>
+              <button aria-label="Select" className={tool === 'select' ? 'selected' : ''} onClick={() => setTool('select')} title="Select"><MousePointer2 size={18} /></button>
+              <button aria-label="Draw" className={tool === 'draw' ? 'selected' : ''} onClick={() => setTool('draw')} title="Draw"><Pencil size={18} /></button>
+              <button aria-label="Highlight" className={tool === 'highlight' ? 'selected' : ''} onClick={() => setTool('highlight')} title="Highlight"><Highlighter size={18} /></button>
+              <button aria-label="Add text" className={tool === 'text' ? 'selected' : ''} onClick={() => setTool('text')} title="Add text"><Type size={18} /></button>
             </div>
             {(tool === 'draw' || tool === 'text') && (
               <label className="color-control" title="Color">
