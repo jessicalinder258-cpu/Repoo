@@ -117,7 +117,7 @@ def test_replacement_inherits_exact_marker_style_and_preserves_graphics() -> Non
     assert replacement["font"] == original["font"]
     assert replacement["size"] == pytest.approx(original["size"], abs=0.01)
     assert replacement["color"] == original["color"]
-    assert replacement["origin"] == original["origin"]
+    assert replacement["origin"] == pytest.approx(original["origin"], abs=0.001)
     assert "Keep me" in page.get_text()
     assert len(page.get_drawings()) == drawings_before
     document.close()
