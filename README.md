@@ -1,7 +1,8 @@
 # PDF Template Editor
 
-A small Windows desktop program that fills placeholders in a PDF template and
-exports the finished document as JPG images.
+A small Windows desktop program customized for the supplied `orig_0734.pdf`
+model. It replaces five editable values and exports the finished document as a
+JPG image.
 
 ## Use the program
 
@@ -13,18 +14,18 @@ exports the finished document as JPG images.
 A one-page PDF produces the selected `.jpg` file. A PDF with multiple pages
 produces files such as `document_page_1.jpg`, `document_page_2.jpg`, and so on.
 
-## Create a template
+## Editable fields
 
-Put placeholder text directly into the PDF:
+- Name replaces `HAY`.
+- Name 2 replaces `BRIA`.
+- Date of birth replaces the first `07/21` on the DOB row.
+- Number is appended directly after `080717`.
+- Bottom number replaces `000175365990716037938`.
 
-- `$name`
-- `=var`
-- `=dob`
-
-The entered value inherits the placeholder's original font, size, color, and
-position. Only the placeholder text is removed; other text, images, graphics,
-neighboring rows, and the page background are preserved. On Windows, the
-editor uses the matching installed Arial font from the template; an
+Each value inherits its target's font, size, color, baseline, and horizontal
+spacing. Only the selected target text is removed; other text, dates, images,
+graphics, neighboring rows, and the page background are preserved. On Windows,
+the editor uses the matching installed Arial or Microsoft Sans Serif font; an
 Arial-compatible font is included as a fallback.
 
 The PDF must contain real selectable text. Placeholders in a scanned image

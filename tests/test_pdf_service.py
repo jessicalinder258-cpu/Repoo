@@ -5,6 +5,8 @@ import pytest
 
 from pdf_template_editor.pdf_service import (
     _apply_marker_values,
+    _apply_template_fields,
+    _template_fields,
     discover_placeholders,
     export_template_as_jpg,
 )
@@ -120,4 +122,54 @@ def test_replacement_inherits_exact_marker_style_and_preserves_graphics() -> Non
     assert replacement["origin"] == pytest.approx(original["origin"], abs=0.001)
     assert "Keep me" in page.get_text()
     assert len(page.get_drawings()) == drawings_before
+    document.close()
+
+
+def test_orig_0734_profile_replaces_five_requested_fields(tmp_path: Path) -> None:
+    template = tmp_path / "orig_0734.pdf"
+    document = pymupdf.open()
+    page = document.new_page(width=800, height=600)
+    page.insert_text((100, 100), "DL NO. 080717", fontsize=20)
+    page.insert_text((100, 140), "DOB 07/21", fontsize=20)
+    page.insert_text((100, 180), "1 HAY", fontsize=20)
+    page.insert_text((100, 220), "2 BRIA", fontsize=20)
+    page.insert_text((100, 300), "EXP 07/21/2030", fontsize=20)
+    page.insert_text((100, 400), "5 DD 000175365990716037938", fontsize=20)
+    document.save(template)
+    document.close()
+
+    placeholders = discover_placeholders(template)
+    assert [placeholder.name for placeholder in placeholders] == [
+        "name",
+        "name2",
+        "dob",
+        "NO",
+        "NO2",
+    ]
+
+    document = pymupdf.open(template)
+    fields = _template_fields(document)
+    assert fields is not None
+    _apply_template_fields(
+        document,
+        fields,
+        {
+            "name": "SMITH",
+            "name2": "JOHN",
+            "dob": "08/14",
+            "NO": "9999",
+            "NO2": "123456789",
+        },
+        FONT_PATH,
+    )
+
+    text = document[0].get_text()
+    assert "HAY" not in text
+    assert "BRIA" not in text
+    assert "SMITH" in text
+    assert "JOHN" in text
+    assert "DOB 08/14" in text
+    assert "EXP 07/21/2030" in text
+    assert "0807179999" in text.replace(" ", "")
+    assert "123456789" in text
     document.close()

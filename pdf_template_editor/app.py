@@ -13,6 +13,15 @@ from .pdf_service import (
 from .resources import resource_path
 
 
+FIELD_LABELS = {
+    "name": "Name",
+    "name2": "Name 2",
+    "dob": "Date of birth",
+    "NO": "Number after 080717",
+    "NO2": "Bottom number",
+}
+
+
 class PdfTemplateEditor(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
@@ -40,8 +49,8 @@ class PdfTemplateEditor(tk.Tk):
         ttk.Label(
             container,
             text=(
-                "Choose a PDF containing placeholders such as $name, =var, "
-                "or =dob."
+                "Choose the PDF model, enter the five replacement values, "
+                "and export the completed image."
             ),
             wraplength=580,
         ).grid(row=1, column=0, sticky="w", pady=(4, 16))
@@ -110,8 +119,8 @@ class PdfTemplateEditor(tk.Tk):
 
         if not placeholders:
             messagebox.showwarning(
-                "No placeholders found",
-                "This PDF does not contain fields such as $name, =var, or =dob.",
+                "Template not recognized",
+                "This PDF does not contain the expected editable fields.",
                 parent=self,
             )
             return
@@ -135,7 +144,10 @@ class PdfTemplateEditor(tk.Tk):
             markers = " / ".join(placeholder.markers)
             ttk.Label(
                 self.fields_frame,
-                text=placeholder.name.replace("_", " ").title(),
+                text=FIELD_LABELS.get(
+                    placeholder.name,
+                    placeholder.name.replace("_", " ").title(),
+                ),
             ).grid(row=row, column=0, sticky="w", padx=(0, 12), pady=6)
             value = tk.StringVar()
             self.field_values[placeholder.name] = value

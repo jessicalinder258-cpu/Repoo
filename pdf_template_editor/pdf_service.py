@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import re
 import os
+import re
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,6 +25,23 @@ class Placeholder:
 
 
 @dataclass(frozen=True)
+class TemplateField:
+    name: str
+    target: str
+    append: bool = False
+    first_match_only: bool = True
+
+
+ORIG_0734_FIELDS = (
+    TemplateField("name", "HAY"),
+    TemplateField("name2", "BRIA"),
+    TemplateField("dob", "07/21"),
+    TemplateField("NO", "080717", append=True),
+    TemplateField("NO2", "000175365990716037938"),
+)
+
+
+@dataclass(frozen=True)
 class TextStyle:
     baseline: float
     font_size: float
@@ -42,6 +59,20 @@ def discover_placeholders(pdf_path: str | Path) -> list[Placeholder]:
         with pymupdf.open(pdf_path) as document:
             if document.page_count == 0:
                 raise TemplateError("The selected PDF has no pages.")
+
+            template_fields = _template_fields(document)
+            if template_fields:
+                return [
+                    Placeholder(
+                        field.name,
+                        (
+                            f"after {field.target}"
+                            if field.append
+                            else field.target,
+                        ),
+                    )
+                    for field in template_fields
+                ]
 
             for page in document:
                 for marker in PLACEHOLDER_PATTERN.findall(page.get_text("text")):
@@ -75,13 +106,17 @@ def export_template_as_jpg(
     try:
         pymupdf.TOOLS.set_small_glyph_heights(True)
         with pymupdf.open(pdf_path) as document:
-            placeholders = discover_placeholders(pdf_path)
-            marker_values = {
-                marker: str(values.get(placeholder.name, ""))
-                for placeholder in placeholders
-                for marker in placeholder.markers
-            }
-            _apply_marker_values(document, marker_values, font_path)
+            template_fields = _template_fields(document)
+            if template_fields:
+                _apply_template_fields(document, template_fields, values, font_path)
+            else:
+                placeholders = discover_placeholders(pdf_path)
+                marker_values = {
+                    marker: str(values.get(placeholder.name, ""))
+                    for placeholder in placeholders
+                    for marker in placeholder.markers
+                }
+                _apply_marker_values(document, marker_values, font_path)
 
             for page_number, page in enumerate(document, start=1):
                 page_output = _page_output_path(
@@ -98,6 +133,66 @@ def export_template_as_jpg(
         raise TemplateError(f"Could not create the JPG: {exc}") from exc
 
     return created_files
+
+
+def _template_fields(
+    document: pymupdf.Document,
+) -> tuple[TemplateField, ...] | None:
+    document_text = "\n".join(page.get_text("text") for page in document)
+    required_targets = {field.target for field in ORIG_0734_FIELDS}
+    if required_targets.issubset(document_text):
+        return ORIG_0734_FIELDS
+    return None
+
+
+def _apply_template_fields(
+    document: pymupdf.Document,
+    fields: tuple[TemplateField, ...],
+    values: Mapping[str, str],
+    font_path: str | Path,
+) -> None:
+    for page in document:
+        replacements: list[
+            tuple[pymupdf.Rect, str, str, TextStyle, float, bool]
+        ] = []
+
+        for field in fields:
+            rectangles = page.search_for(field.target)
+            if field.first_match_only and rectangles:
+                rectangles = [min(rectangles, key=lambda rectangle: rectangle.y0)]
+
+            for rectangle in rectangles:
+                replacements.append(
+                    (
+                        rectangle,
+                        field.target,
+                        str(values.get(field.name, "")),
+                        _style_at_rectangle(page, rectangle),
+                        rectangle.x1 if field.append else rectangle.x0,
+                        not field.append,
+                    )
+                )
+                if not field.append:
+                    page.add_redact_annot(
+                        _redaction_hit_box(rectangle),
+                        fill=False,
+                        cross_out=False,
+                    )
+
+        if any(replacement[-1] for replacement in replacements):
+            page.apply_redactions(images=0, graphics=0)
+
+        for rectangle, target, value, style, origin_x, _redacted in replacements:
+            if value:
+                _insert_replacement(
+                    page,
+                    rectangle,
+                    target,
+                    value,
+                    style,
+                    font_path,
+                    origin_x=origin_x,
+                )
 
 
 def _apply_marker_values(
@@ -194,12 +289,18 @@ def _insert_replacement(
     value: str,
     style: TextStyle,
     fallback_font_path: str | Path,
+    *,
+    origin_x: float | None = None,
 ) -> None:
     font_path = _matching_system_font(style.font_family, fallback_font_path)
     horizontal_scale = _horizontal_scale(
         marker, rectangle.width, style.font_size, font_path
     )
-    origin = pymupdf.Point(rectangle.x0, style.baseline)
+    origin = pymupdf.Point(
+        rectangle.x0 if origin_x is None else origin_x,
+        style.baseline,
+    )
+    resource_name = f"replacement{_normalized_font_name(style.font_family)[:24]}"
 
     page.insert_text(
         origin,
@@ -207,7 +308,7 @@ def _insert_replacement(
         fontsize=style.font_size,
         color=style.color,
         fill_opacity=style.opacity,
-        fontname="replacementfont",
+        fontname=resource_name,
         fontfile=str(font_path),
         morph=(origin, pymupdf.Matrix(horizontal_scale, 1)),
         overlay=True,
@@ -232,6 +333,8 @@ def _matching_system_font(
         candidates.append(
             "calibrib.ttf" if "bold" in normalized else "calibri.ttf"
         )
+    elif "microsoftsansserif" in normalized:
+        candidates.append("micross.ttf")
 
     for candidate in candidates:
         path = windows_fonts / candidate
