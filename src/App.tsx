@@ -290,7 +290,7 @@ function App() {
   }
 
   const closeDocument = () => {
-    void document?.destroy()
+    document?.cleanup()
     setDocument(null)
     setFile(null)
     setMarks({})
