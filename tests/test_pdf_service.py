@@ -3,6 +3,7 @@ from pathlib import Path
 import pymupdf
 
 from pdf_template_editor.pdf_service import (
+    _apply_marker_values,
     discover_placeholders,
     export_template_as_jpg,
 )
@@ -75,3 +76,38 @@ def test_exports_multiple_pages_with_numbered_names(tmp_path: Path) -> None:
         "completed_page_2.jpg",
     ]
     assert all(path.is_file() for path in files)
+
+
+def test_replacement_inherits_exact_marker_style_and_preserves_graphics() -> None:
+    document = pymupdf.open()
+    page = document.new_page(width=400, height=250)
+    page.draw_rect(
+        pymupdf.Rect(20, 20, 380, 100),
+        color=(0.1, 0.3, 0.7),
+        fill=(0.8, 0.9, 1.0),
+    )
+    page.insert_text(
+        (30, 70),
+        "$name",
+        fontname="tibo",
+        fontsize=17,
+        color=(0.2, 0.4, 0.6),
+    )
+    page.insert_text((200, 70), "Keep me", fontsize=11)
+    drawings_before = len(page.get_drawings())
+
+    _apply_marker_values(document, {"$name": "Alice"}, FONT_PATH)
+
+    spans = [
+        span
+        for block in page.get_text("dict")["blocks"]
+        for line in block.get("lines", [])
+        for span in line.get("spans", [])
+    ]
+    replacement = next(span for span in spans if "Alice" in span["text"])
+    assert replacement["font"] == "Times-Bold"
+    assert replacement["size"] == 17
+    assert replacement["color"] == 0x336699
+    assert "Keep me" in page.get_text()
+    assert len(page.get_drawings()) == drawings_before
+    document.close()

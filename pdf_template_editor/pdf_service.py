@@ -27,6 +27,8 @@ class TextStyle:
     baseline: float
     font_size: float
     color: tuple[float, float, float]
+    font_name: str | None
+    opacity: float
 
 
 def discover_placeholders(pdf_path: str | Path) -> list[Placeholder]:
@@ -73,30 +75,7 @@ def export_template_as_jpg(
                 for placeholder in placeholders
                 for marker in placeholder.markers
             }
-
-            for page in document:
-                replacements: list[tuple[pymupdf.Rect, str, TextStyle]] = []
-
-                for marker, value in marker_values.items():
-                    for rectangle in page.search_for(marker):
-                        replacements.append(
-                            (rectangle, value, _style_at_rectangle(page, rectangle))
-                        )
-                        page.add_redact_annot(rectangle, fill=(1, 1, 1))
-
-                if replacements:
-                    page.apply_redactions()
-                    for rectangle, value, style in replacements:
-                        if value:
-                            page.insert_text(
-                                (rectangle.x0, style.baseline),
-                                value,
-                                fontsize=style.font_size,
-                                fontname="templatefont",
-                                fontfile=str(font_path),
-                                color=style.color,
-                                overlay=True,
-                            )
+            _apply_marker_values(document, marker_values, font_path)
 
             for page_number, page in enumerate(document, start=1):
                 page_output = _page_output_path(
@@ -115,6 +94,34 @@ def export_template_as_jpg(
     return created_files
 
 
+def _apply_marker_values(
+    document: pymupdf.Document,
+    marker_values: Mapping[str, str],
+    font_path: str | Path,
+) -> None:
+    for page in document:
+        replacements: list[tuple[pymupdf.Rect, str, TextStyle]] = []
+
+        for marker, value in marker_values.items():
+            for rectangle in page.search_for(marker):
+                replacements.append(
+                    (rectangle, value, _style_at_rectangle(page, rectangle))
+                )
+                page.add_redact_annot(
+                    rectangle,
+                    fill=False,
+                    cross_out=False,
+                )
+
+        if replacements:
+            # Remove only the placeholder glyphs. Images, vector graphics, and
+            # the original page background must remain untouched.
+            page.apply_redactions(images=0, graphics=0)
+            for rectangle, value, style in replacements:
+                if value:
+                    _insert_replacement(page, rectangle, value, style, font_path)
+
+
 def _page_output_path(base: Path, page_number: int, page_count: int) -> Path:
     if page_count == 1:
         return base.with_suffix(".jpg")
@@ -131,13 +138,65 @@ def _style_at_rectangle(page: pymupdf.Page, rectangle: pymupdf.Rect) -> TextStyl
                         baseline=float(span["origin"][1]),
                         font_size=max(4.0, float(span["size"])),
                         color=_pdf_color(int(span.get("color", 0))),
+                        font_name=_font_resource(page, str(span.get("font", ""))),
+                        opacity=max(
+                            0.0, min(1.0, float(span.get("alpha", 255)) / 255)
+                        ),
                     )
 
     return TextStyle(
         baseline=rectangle.y1 - max(1.0, rectangle.height * 0.18),
         font_size=max(4.0, rectangle.height * 0.75),
         color=(0.0, 0.0, 0.0),
+        font_name=None,
+        opacity=1.0,
     )
+
+
+def _insert_replacement(
+    page: pymupdf.Page,
+    rectangle: pymupdf.Rect,
+    value: str,
+    style: TextStyle,
+    fallback_font_path: str | Path,
+) -> None:
+    font_arguments: dict[str, str] = {}
+    if style.font_name:
+        # Reuse the font resource already embedded in this PDF page. This keeps
+        # weight, italics, glyph widths, and typeface identical to the marker.
+        font_arguments["fontname"] = style.font_name
+    else:
+        font_arguments["fontname"] = "templatefont"
+        font_arguments["fontfile"] = str(fallback_font_path)
+
+    page.insert_text(
+        (rectangle.x0, style.baseline),
+        value,
+        fontsize=style.font_size,
+        color=style.color,
+        fill_opacity=style.opacity,
+        overlay=True,
+        **font_arguments,
+    )
+
+
+def _font_resource(page: pymupdf.Page, span_font_name: str) -> str | None:
+    target = _normalized_font_name(span_font_name)
+    if not target:
+        return None
+
+    for font in page.get_fonts(full=True):
+        base_font_name = str(font[3])
+        resource_name = str(font[4])
+        if _normalized_font_name(base_font_name) == target:
+            return resource_name
+    return None
+
+
+def _normalized_font_name(font_name: str) -> str:
+    # Embedded subset names commonly look like "ABCDEF+Arial-BoldMT".
+    font_name = re.sub(r"^[A-Z]{6}\+", "", font_name)
+    return re.sub(r"[^a-z0-9]", "", font_name.lower())
 
 
 def _pdf_color(value: int) -> tuple[float, float, float]:
