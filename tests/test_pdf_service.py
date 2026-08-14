@@ -1,0 +1,177 @@
+from pathlib import Path
+
+import pymupdf
+import pytest
+
+from pdf_template_editor.pdf_service import (
+    _apply_marker_values,
+    _apply_template_fields,
+    _template_fields,
+    discover_placeholders,
+    export_template_as_jpg,
+)
+
+
+FONT_PATH = Path(__file__).parents[1] / "assets" / "Arimo-Bold.ttf"
+
+
+def make_template(path: Path, pages: int = 1) -> None:
+    document = pymupdf.open()
+    for page_number in range(pages):
+        page = document.new_page(width=400, height=250)
+        page.insert_text((30, 50), "Customer: $name", fontsize=12)
+        page.insert_text((30, 80), "Birth date: =dob", fontsize=12)
+        if page_number == 0:
+            page.insert_text((30, 110), "Reference: =var and again =var", fontsize=12)
+    document.save(path)
+    document.close()
+
+
+def test_discovers_unique_fields_in_document_order(tmp_path: Path) -> None:
+    template = tmp_path / "template.pdf"
+    make_template(template)
+
+    placeholders = discover_placeholders(template)
+
+    assert [placeholder.name for placeholder in placeholders] == [
+        "name",
+        "dob",
+        "var",
+    ]
+    assert placeholders[0].markers == ("$name",)
+
+
+def test_exports_single_page_to_selected_jpg(tmp_path: Path) -> None:
+    template = tmp_path / "template.pdf"
+    make_template(template)
+    output = tmp_path / "completed.jpg"
+
+    files = export_template_as_jpg(
+        template,
+        {"name": "José Smith", "dob": "2000-01-31", "var": "ABC-123"},
+        output,
+        FONT_PATH,
+        dpi=100,
+    )
+
+    assert files == [output]
+    assert output.is_file()
+    image = pymupdf.open(output)
+    assert image.page_count == 1
+    assert image[0].rect.width > 0
+    image.close()
+
+
+def test_exports_multiple_pages_with_numbered_names(tmp_path: Path) -> None:
+    template = tmp_path / "template.pdf"
+    make_template(template, pages=2)
+
+    files = export_template_as_jpg(
+        template,
+        {"name": "Test", "dob": "Today", "var": ""},
+        tmp_path / "completed.jpg",
+        FONT_PATH,
+        dpi=72,
+    )
+
+    assert [path.name for path in files] == [
+        "completed_page_1.jpg",
+        "completed_page_2.jpg",
+    ]
+    assert all(path.is_file() for path in files)
+
+
+def test_replacement_inherits_exact_marker_style_and_preserves_graphics() -> None:
+    document = pymupdf.open()
+    page = document.new_page(width=400, height=250)
+    page.draw_rect(
+        pymupdf.Rect(20, 20, 380, 100),
+        color=(0.1, 0.3, 0.7),
+        fill=(0.8, 0.9, 1.0),
+    )
+    page.insert_text(
+        (30, 70),
+        "$name",
+        fontname="templatearial",
+        fontfile=str(FONT_PATH),
+        fontsize=17,
+        color=(0.2, 0.4, 0.6),
+    )
+    page.insert_text((200, 70), "Keep me", fontsize=11)
+    drawings_before = len(page.get_drawings())
+    original = next(
+        span
+        for block in page.get_text("dict")["blocks"]
+        for line in block.get("lines", [])
+        for span in line.get("spans", [])
+        if "$name" in span["text"]
+    )
+
+    _apply_marker_values(document, {"$name": "Alice"}, FONT_PATH)
+
+    spans = [
+        span
+        for block in page.get_text("dict")["blocks"]
+        for line in block.get("lines", [])
+        for span in line.get("spans", [])
+    ]
+    replacement = next(span for span in spans if "Alice" in span["text"])
+    assert replacement["font"] == original["font"]
+    assert replacement["size"] == pytest.approx(original["size"], abs=0.01)
+    assert replacement["color"] == original["color"]
+    assert replacement["origin"] == pytest.approx(original["origin"], abs=0.001)
+    assert "Keep me" in page.get_text()
+    assert len(page.get_drawings()) == drawings_before
+    document.close()
+
+
+def test_orig_0734_profile_replaces_five_requested_fields(tmp_path: Path) -> None:
+    template = tmp_path / "orig_0734.pdf"
+    document = pymupdf.open()
+    page = document.new_page(width=800, height=600)
+    page.insert_text((100, 100), "DL NO. 080717", fontsize=20)
+    page.insert_text((100, 140), "DOB 07/21", fontsize=20)
+    page.insert_text((100, 180), "1 HAY", fontsize=20)
+    page.insert_text((100, 220), "2 BRIA", fontsize=20)
+    page.insert_text((100, 300), "EXP 07/21/2030", fontsize=20)
+    page.insert_text((100, 400), "5 DD 000175365990716037938", fontsize=20)
+    document.save(template)
+    document.close()
+
+    placeholders = discover_placeholders(template)
+    assert [placeholder.name for placeholder in placeholders] == [
+        "name",
+        "name2",
+        "dob",
+        "NO",
+        "NO2",
+    ]
+
+    document = pymupdf.open(template)
+    fields = _template_fields(document)
+    assert fields is not None
+    _apply_template_fields(
+        document,
+        fields,
+        {
+            "name": "SMITH",
+            "name2": "JOHN",
+            "dob": "08/14",
+            "NO": "9999",
+            "NO2": "123456789",
+        },
+        FONT_PATH,
+    )
+
+    text = document[0].get_text()
+    assert "HAY" not in text
+    assert "BRIA" not in text
+    assert "SMITH" in text
+    assert "JOHN" in text
+    assert "08/14" in text
+    assert "EXP 07/21/2030" in text
+    assert text.count("07/21") == 1
+    assert "080717" in text
+    assert "9999" in text
+    assert "123456789" in text
+    document.close()
